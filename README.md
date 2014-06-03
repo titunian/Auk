@@ -3,7 +3,7 @@ Auk Music 0.1
 ==============
 
 
-Auk is a soundcloud-echonest based radio which returns http streams of similar tracks(radio) to the root_track
+Auk is a soundcloud-echonest based stream fetcher which returns http streams of similar tracks(radio) to a root_track
 
 
 1. How to setup:
