@@ -1,2 +1,5 @@
 soundcloud==0.4.1
 pyen==2.3
+for gui:
+PyQt4
+pygst
