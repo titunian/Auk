@@ -1,7 +1,11 @@
+from __future__ import division
 import sys
 from PyQt4 import QtGui, QtCore
+from math import ceil
 
 import auk
+
+# Would have been brilliant if Phonon had behaved properly. gst is kickass.
 import gobject
 import pygst
 pygst.require("0.10")
@@ -58,20 +62,65 @@ class aukWindow(QtGui.QWidget):
 		self.button.clicked.connect(self.fetch_and_update)
 		self.table.itemPressed.connect(self.play_track)
 
+		self.slider = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+		self.setFocusPolicy(QtCore.Qt.NoFocus)
+		self.slider.setRange(0,100)
+		self.layout.addWidget(self.slider,3,2)
+		self.slider.sliderReleased.connect(self.slider_seek)
+
+		self.timer = QtCore.QTimer()
+		self.timer.timeout.connect(self.update_slider)
+		self.timer.start(1000)
 
 		#self.cb = QtGui.QApplication.clipboard()
-
+		self.is_playing = False
 		self.songsplayed = 0
 		self.show()
+
+
+	def slider_seek(self):
+		self.seek_ns = (self.slider.value()/100)*self.play_duration()
+		self.player.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, self.seek_ns)
+	
+	def play_duration(self):
+		duration_nanosecs, duration_format = self.player.query_duration(gst.FORMAT_TIME)
+		return duration_nanosecs
+
+	def fetch_position(self):
+		try:
+			position_nanosecs, position_format = self.player.query_position(gst.FORMAT_TIME)
+			duration_nanosecs, duration_format = self.player.query_duration(gst.FORMAT_TIME)
+
+			#print (position_nanosecs/duration_nanosecs)*100
+			return (position_nanosecs/duration_nanosecs)*100
+		except gst.QueryError:
+			# pipeline does not know position yet
+			pass
+
+	def update_slider(self):
+		if not self.is_playing:
+			return False
+		else:
+			try:
+				self.slider.setValue(self.fetch_position())
+			except:
+				pass
 
 	def on_message(self,bus,message):
 		t = message.type
 		if t == gst.MESSAGE_EOS:
 			self.player.set_state(gst.STATE_NULL)
+			self.slider.setValue(0)
+			self.is_playing = False
 			self.table.item(self.now_playing,1).setIcon(QtGui.QIcon.fromTheme('media-playback-start'))
 		elif t == gst.MESSAGE_ERROR:
 			err, debug = message.parse_error()
+			self.statusinfo.setText("Something wicked happened.")
+			QtGui.QApplication.processEvents()
+
 			self.player.set_state(gst.STATE_NULL)
+			self.slider.setValue(0)
+			self.is_playing = False
 			self.table.item(self.now_playing,1).setIcon(QtGui.QIcon.fromTheme('media-playback-start'))
 			print "Error is %s" % err, debug
 
@@ -110,6 +159,7 @@ class aukWindow(QtGui.QWidget):
 
 			if song_uri == self.player.get_property('uri'):
 				self.player.set_state(gst.STATE_PAUSED)
+				self.is_playing = False
 				item.setIcon(starticon)
 				self.now_playing = irowactual
 			else:
@@ -117,11 +167,13 @@ class aukWindow(QtGui.QWidget):
 				self.player.set_state(gst.STATE_NULL)
 				self.player.set_property('uri',song_uri)
 				self.player.set_state(gst.STATE_PLAYING)
+				self.is_playing = True
 				item.setIcon(pauseicon)
 				self.now_playing = irowactual
 		else:
 			if song_uri == self.player.get_property('uri'):
 				self.player.set_state(gst.STATE_PLAYING)
+				self.is_playing = True
 				item.setIcon(pauseicon)
 				self.now_playing = irowactual
 			else:
@@ -130,6 +182,7 @@ class aukWindow(QtGui.QWidget):
 				self.player.set_state(gst.STATE_NULL)
 				self.player.set_property('uri',song_uri)
 				self.player.set_state(gst.STATE_PLAYING)
+				self.is_playing = True
 				self.songplayed = 1
 				item.setIcon(pauseicon)
 				self.now_playing = irowactual
