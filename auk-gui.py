@@ -1,15 +1,13 @@
 from __future__ import division
 import sys
 from PyQt4 import QtGui, QtCore
-from math import ceil
-
 import auk
-
 # Would have been brilliant if Phonon had behaved properly. gst is kickass.
 import gobject
 import pygst
 pygst.require("0.10")
 import gst
+
 
 
 class aukWindow(QtGui.QWidget):
@@ -37,7 +35,7 @@ class aukWindow(QtGui.QWidget):
 		self.table.setAlternatingRowColors(True)
 		self.table.setRowCount(10)
 		self.table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-		self.table.setMinimumWidth(500)
+		self.table.setMinimumWidth(570)
 		self.table.setMinimumHeight(300)
 		self.table.verticalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
 		self.table.horizontalHeader().setStretchLastSection(True)
@@ -61,7 +59,7 @@ class aukWindow(QtGui.QWidget):
 		self.trackedit.textChanged.connect(self.enablebutton)
 		self.button.clicked.connect(self.fetch_and_update)
 		self.table.itemPressed.connect(self.play_track)
-
+		self.artistedit.returnPressed.connect(self.fetch_and_update)
 		self.slider = QtGui.QSlider(QtCore.Qt.Horizontal, self)
 		self.setFocusPolicy(QtCore.Qt.NoFocus)
 		self.slider.setRange(0,100)
