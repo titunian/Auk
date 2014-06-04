@@ -1,8 +1,8 @@
 import sys, soundcloud, pyen
 
 #Configuration
-pyen_key = "8GDKECFTIJHEADTWC" #echonest
-client_id = "53188e4558d06691aac3cf57ef3a7cd7" #soundcloud
+pyen_key = "pyen_key" #echonest
+client_id = "client_id" #soundcloud
 en = pyen.Pyen(pyen_key)
 client = soundcloud.Client(client_id=client_id)
 def auk(root_track, root_artist = None):
