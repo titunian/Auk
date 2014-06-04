@@ -65,7 +65,6 @@ class aukWindow(QtGui.QWidget):
 		self.show()
 
 	def on_message(self,bus,message):
-		print "I am here"
 		t = message.type
 		if t == gst.MESSAGE_EOS:
 			self.player.set_state(gst.STATE_NULL)
