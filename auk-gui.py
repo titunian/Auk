@@ -58,7 +58,6 @@ class aukWindow(QtGui.QWidget):
 		self.button.clicked.connect(self.fetch_and_update)
 		self.table.itemPressed.connect(self.play_track)
 
-
 		#self.cb = QtGui.QApplication.clipboard()
 
 		self.songsplayed = 0
