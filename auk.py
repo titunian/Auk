@@ -1,31 +1,41 @@
 import sys, soundcloud, pyen
 
 #Configuration
-pyen_key = "pyen_key" #echonest
-client_id = "client_id" #soundcloud
+pyen_key = "8GDKECFTIJHEADTWC" #echonest
+client_id = "53188e4558d06691aac3cf57ef3a7cd7" #soundcloud
 en = pyen.Pyen(pyen_key)
 client = soundcloud.Client(client_id=client_id)
-def auk(root_track, root_artist = None):
+def aukfetch(root_track, root_artist = None):
+	related_dict={}
 
-	response = en.get('song/search', artist=root_artist, title=root_track, bucket=['audio_summary'], results=1)
+	# response = en.get('song/search', artist=root_artist, title=root_track, bucket=['audio_summary'], results=1)
 	
-	for song in response['songs']:
-		root_duration = song["audio_summary"]['duration']
-	#print root_duration
-	root_artist = song["artist_name"]
-	root_track = song["title"]
-	#handle exceptions for license
-	print "root %-32.32s %s" % (root_artist, root_track)
-	print sc_streamurl(root_track, root_artist, root_duration)
-	response = en.get('playlist/static', artist=root_artist, type='artist-radio', results=50)
+	# for song in response['songs']:
+	# 	root_duration = song["audio_summary"]['duration']
+	# #print root_duration
+	# root_artist = song["artist_name"]
+	# root_track = song["title"]
+	# #handle exceptions for license
+	# print "root %-32.32s %s" % (root_artist, root_track)
+	# print sc_streamurl(root_track, root_artist, root_duration)
+	response = en.get('playlist/static', artist=root_artist, type='artist-radio', results=10)
 
 
 	for i, new_song in enumerate(response['songs']):
+		templist=[]
 		response2 = en.get('song/search', artist=new_song['artist_name'], title=new_song['title'], bucket=['audio_summary'], results=1)
 		for song in response2['songs']:
 			new__duration = song["audio_summary"]['duration']
-		print "%d %-32.32s %s" % (i, new_song['artist_name'], new_song['title'])
-		print sc_streamurl(new_song['title'], new_song['artist_name'], new__duration)
+		#print "%d %-32.32s %s" % (i, new_song['artist_name'], new_song['title'])
+		#print sc_streamurl(new_song['title'], new_song['artist_name'], new__duration)
+
+		templist.append(new_song['artist_name'])
+		templist.append(new_song['title'])
+		templist.append(sc_streamurl(new_song['title'], new_song['artist_name'], new__duration))
+
+		related_dict[i] = templist
+
+	return related_dict
 
 
 def sc_streamurl(root_track, root_artist, root_duration):
@@ -49,8 +59,8 @@ def sc_streamurl(root_track, root_artist, root_duration):
 		except:
 			pass
 
-print "Welcome to auk-0.1","\n"
-root_track= raw_input("Enter track name:  ")
-root_artist = raw_input("Enter artist name: ")
+# print "Welcome to auk-0.1","\n"
+# root_track= raw_input("Enter track name:  ")
+# root_artist = raw_input("Enter artist name: ")
 
-auk(root_track, root_artist)
+# auk(root_track, root_artist)
