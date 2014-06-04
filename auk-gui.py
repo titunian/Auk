@@ -2,7 +2,7 @@ import sys
 from PyQt4 import QtGui, QtCore
 
 import auk
-
+import gobject
 import pygst
 pygst.require("0.10")
 import gst
@@ -64,8 +64,26 @@ class aukWindow(QtGui.QWidget):
 		self.songsplayed = 0
 		self.show()
 
+	def on_message(self,bus,message):
+		print "I am here"
+		t = message.type
+		if t == gst.MESSAGE_EOS:
+			self.player.set_state(gst.STATE_NULL)
+			self.table.item(self.now_playing,1).setIcon(QtGui.QIcon.fromTheme('media-playback-start'))
+		elif t == gst.MESSAGE_ERROR:
+			err, debug = message.parse_error()
+			self.player.set_state(gst.STATE_NULL)
+			self.table.item(self.now_playing,1).setIcon(QtGui.QIcon.fromTheme('media-playback-start'))
+			print "Error is %s" % err, debug
+
+
 	def initiate_audio_sink(self):
-		self.player = gst.element_factory_make("playbin2", "player")
+		self.player = gst.element_factory_make("playbin", "player")
+		bus = self.player.get_bus()
+		bus.add_signal_watch()
+		bus.enable_sync_message_emission()
+		bus.connect("message",self.on_message)
+		print "Created BUS"
 
 	#def toclipboard(self):
 	#	self.cb.setText(self.related_songs_dict[self.now_playing,2])
@@ -165,6 +183,7 @@ class aukWindow(QtGui.QWidget):
 		self.trackedit.setText("")
 
 def main():
+	gobject.threads_init()
 	app = QtGui.QApplication(sys.argv)
 	appins = aukWindow()
 	sys.exit(app.exec_())
