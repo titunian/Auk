@@ -124,7 +124,8 @@ class aukWindow(QtGui.QWidget):
 			self.button.setEnabled(True)
 
 	def fetch_and_update(self):
-		
+		self.statusinfo.setText("Fetching results. Please stand by.")
+		QtGui.QApplication.processEvents()
 		self.artistinfo = self.artistedit.text()
 		self.trackinfo = self.trackedit.text()
 
