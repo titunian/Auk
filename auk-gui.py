@@ -17,15 +17,16 @@ class aukWindow(QtGui.QWidget):
 		self.setWindowTitle("Auk Recommendation Service")
 		self.layout = QtGui.QGridLayout(self)
 
+		## Track input
 		self.trackedit = QtGui.QLineEdit(self)
 		self.trackedit.setPlaceholderText("Enter track name")
-
+		##Artist input
 		self.artistedit = QtGui.QLineEdit(self)
 		self.artistedit.setPlaceholderText("Enter artist name")
-
+		## Search button
 		self.button = QtGui.QPushButton("Search",self)
 		self.button.setEnabled(False)
-
+		## Tablewidget
 		self.table = QtGui.QTableWidget(self)
 		self.table.setColumnCount(4)
 		self.table.setWordWrap(True)
@@ -40,15 +41,12 @@ class aukWindow(QtGui.QWidget):
 		self.table.verticalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
 		self.table.horizontalHeader().setStretchLastSection(True)
 		self.table.setSizePolicy(QtGui.QSizePolicy.Expanding,QtGui.QSizePolicy.Expanding)
-
 		self.table.setColumnWidth(0,35)
 		self.table.setColumnWidth(1,50)
 		self.table.setColumnWidth(2,300)
-
-
+		## Status bar
 		self.statusinfo = QtGui.QLabel(self)
 		self.statusinfo.setText("Welcome.")
-
 
 		self.layout.addWidget(self.trackedit,1,0)
 		self.layout.addWidget(self.artistedit,1,1)
@@ -77,14 +75,17 @@ class aukWindow(QtGui.QWidget):
 
 
 	def slider_seek(self):
+		"""Gets the slider value and seeks forward or backward accordingly"""
 		self.seek_ns = (self.slider.value()/100)*self.play_duration()
 		self.player.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, self.seek_ns)
 	
 	def play_duration(self):
+		"""Returns the duration of the song in nano seconds. """
 		duration_nanosecs, duration_format = self.player.query_duration(gst.FORMAT_TIME)
 		return duration_nanosecs
 
 	def fetch_position(self):
+		"""Returns the percentage of song that has been played"""
 		try:
 			position_nanosecs, position_format = self.player.query_position(gst.FORMAT_TIME)
 			duration_nanosecs, duration_format = self.player.query_duration(gst.FORMAT_TIME)
@@ -96,6 +97,7 @@ class aukWindow(QtGui.QWidget):
 			pass
 
 	def update_slider(self):
+		"""Updates the position of the slider based on the position of the current track being played"""
 		if not self.is_playing:
 			return False
 		else:
@@ -105,6 +107,7 @@ class aukWindow(QtGui.QWidget):
 				pass
 
 	def on_message(self,bus,message):
+		""" End of track and error handling of gst"""
 		t = message.type
 		if t == gst.MESSAGE_EOS:
 			self.player.set_state(gst.STATE_NULL)
@@ -124,6 +127,7 @@ class aukWindow(QtGui.QWidget):
 
 
 	def initiate_audio_sink(self):
+		""" Sets up the playbin and the bus for audio playback."""
 		self.player = gst.element_factory_make("playbin", "player")
 		bus = self.player.get_bus()
 		bus.add_signal_watch()
@@ -135,7 +139,7 @@ class aukWindow(QtGui.QWidget):
 	#	self.cb.setText(self.related_songs_dict[self.now_playing,2])
 
 	def play_track(self,item):
-
+		"""Plays, pauses and stops tracks in response to the tablwwidgetitem clicks """
 		if item.column() != 1:
 			return False
 
@@ -186,12 +190,14 @@ class aukWindow(QtGui.QWidget):
 				self.now_playing = irowactual
 
 	def enablebutton(self):
+		"""Enables search button only when the track edit field is not empty"""
 		if self.trackedit.text() == "":
 			self.button.setEnabled(False)
 		else:
 			self.button.setEnabled(True)
 
 	def fetch_and_update(self):
+		"""Queries the auk backend for the track listing. Fetches a dict"""
 		self.statusinfo.setText("Fetching results. Please stand by.")
 		QtGui.QApplication.processEvents()
 		self.artistinfo = self.artistedit.text()
