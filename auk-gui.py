@@ -8,6 +8,17 @@ import pygst
 pygst.require("0.10")
 import gst
 
+## Subclassing qslider to dynamically display tooltip
+class mSlider(QtGui.QSlider):
+	show_tooltip = QtCore.pyqtSignal(object)
+	def __init__(self):
+		QtGui.QSlider.__init__(self)
+
+	def mouseMoveEvent(self, event):
+		#self.mouseMoveEvent(event)
+		self.show_tooltip.emit(event) # sending event to help figure the x cordinate of the slider
+		return QtGui.QSlider.mouseMoveEvent(self, event)
+
 
 class fetchInfoThread(QtCore.QThread):
 	fetch_complete = QtCore.pyqtSignal(object)
@@ -68,9 +79,13 @@ class aukWindow(QtGui.QWidget):
 		self.statusinfo.setText("Welcome.")
 
 		## Slider
-		self.slider = QtGui.QSlider(QtCore.Qt.Horizontal, self)
-		self.setFocusPolicy(QtCore.Qt.NoFocus)
+		self.slider = mSlider()
+		self.slider.setOrientation(QtCore.Qt.Horizontal)
+		#self.slider = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+		self.slider.setMouseTracking(True) ## Enables dynamic tooltips as implemented in the code.
 		self.slider.setRange(0,100)
+		#hell yeah
+		self.slider.show_tooltip.connect(self.display_slider_tooltip)
 
 		## Adding widgets to the layout.
 		self.layout.addWidget(self.slider,3,2)
@@ -102,9 +117,10 @@ class aukWindow(QtGui.QWidget):
 		self.refresh_done = 0
 		# Counts the resources fetched
 		self.fcount = 0
+		## Helps avoid conflict during seeking
+		self.setting_value = 0
 
 		self.show()
-
 
 	def refetch_track(self):
 		self.statusinfo.setText("Trying to refetch the track. Stand by")
@@ -125,20 +141,41 @@ class aukWindow(QtGui.QWidget):
 		self.refresh_done = 1
 		self.play_track(self.table.item(self.now_playing,1))
 
+	def convert_ns(self,value):
+		tsecs = value/1e9
+		## add hours if needed
+		minutes = str(tsecs/60).split(".")[0]
+		seconds = str(tsecs % 60).split(".")[0]
 
+		return minutes+":"+seconds
 
+	def display_slider_tooltip(self,event):
+		if not "NULL" in str(self.player.get_state()[1]):
+			#QtGui.QToolTip.showText(event.globalPos(), str(-1), self) ## Constantly change the value so that the tooltip follows the pointer
+			## as read in the qt docs
+			percentage_pos = round(((self.slider.minimum() + (self.slider.maximum() - self.slider.minimum()))*event.x())/self.slider.width(),2)
+			play_pos = (percentage_pos*self.play_duration())/100
+			tool_text = self.convert_ns(play_pos)+"/"+self.convert_ns(self.play_duration())+"\n"+"  "+str(percentage_pos)+"%"
+
+			QtGui.QToolTip.showText(event.globalPos(), tool_text, self)
 
 	def slider_seek(self):
 		"""Gets the slider value and seeks forward or backward accordingly"""
-		self.seek_ns = (self.slider.value()/100)*self.play_duration()
-		self.player.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, self.seek_ns)
-	
+		self.setting_value = 1
+		if not "NULL" in str(self.player.get_state()[1]):
+			self.seek_ns = (self.slider.value()/100)*self.play_duration()
+			self.player.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, self.seek_ns)
+		self.setting_value = 0
 
 	def play_duration(self):
 		"""Returns the duration of the song in nano seconds. """
 		duration_nanosecs, duration_format = self.player.query_duration(gst.FORMAT_TIME)
 		return duration_nanosecs
 
+	def play_position(self):
+		"""Returns the position of the song in nanoseconds"""
+		position_nanosecs, position_format = self.player.query_position(gst.FORMAT_TIME)
+		return position_nanosecs
 
 	def fetch_position(self):
 		"""Returns the percentage of song that has been played"""
@@ -149,17 +186,17 @@ class aukWindow(QtGui.QWidget):
 			# pipeline does not know position yet
 			pass
 
-
 	def update_slider(self):
 		"""Updates the position of the slider based on the position of the current track being played"""
+
 		if not self.is_playing:
 			return False
 		else:
-			try:
-				self.slider.setValue(self.fetch_position())
-			except:
-				pass
-
+			if not self.setting_value:
+				try:
+					self.slider.setValue(self.fetch_position())
+				except:
+					pass
 
 	def on_message(self,bus,message):
 		""" End of track and error handling of gst"""
@@ -184,7 +221,6 @@ class aukWindow(QtGui.QWidget):
 			else:
 				self.refetch_track()
 			
-
 	def play_next(self):
 
 		## Can't include all of it inside the while loop since the play order is random.
@@ -202,7 +238,6 @@ class aukWindow(QtGui.QWidget):
 		else:
 			pass
 
-
 	def initiate_audio_sink(self):
 		""" Sets up the playbin and the bus for audio playback."""
 		self.player = gst.element_factory_make("playbin", "player")
@@ -215,7 +250,6 @@ class aukWindow(QtGui.QWidget):
 
 	#def toclipboard(self):
 	#	self.cb.setText(self.related_songs_dict[self.now_playing,2])
-
 
 	def play_track(self,item):
 		"""Plays, pauses and stops tracks in response to the tablwwidgetitem clicks """
@@ -277,14 +311,12 @@ class aukWindow(QtGui.QWidget):
 				item.setIcon(pauseicon)
 				QtGui.QApplication.processEvents()
 				
-
 	def enablebutton(self):
 		"""Enables search button only when the track edit field is not empty"""
 		if self.trackedit.text() == "":
 			self.button.setEnabled(False)
 		else:
 			self.button.setEnabled(True)
-
 
 	def on_fetch_data(self,songinfo):
 		key = songinfo[3]
@@ -327,7 +359,6 @@ class aukWindow(QtGui.QWidget):
 			self.trackedit.setText("")
 			self.fcount = 0
 
-
 	def fetch_and_update(self):
 		"""Queries the auk backend for the track listing. Fetches a dict"""
 
@@ -353,7 +384,6 @@ class aukWindow(QtGui.QWidget):
 			self.threads.append(fetcher)
 			fetcher.start()
 
-
 def main():
 	gobject.threads_init()
 	app = QtGui.QApplication(sys.argv)
@@ -367,7 +397,8 @@ if __name__ == "__main__":
 
 
 	## TO DO:
-	## Display time
 	## Refine seek
 	## paint QSlider
 	## integrate last fm
+	## desktop notifications vis systray
+	## add about and acknowlwdge all libs/APIs used.
