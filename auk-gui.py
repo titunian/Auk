@@ -94,11 +94,35 @@ class aukWindow(QtGui.QWidget):
 		#self.slider = QtGui.QSlider(QtCore.Qt.Horizontal, self)
 		self.slider.setMouseTracking(True) ## Enables dynamic tooltips as implemented in the code.
 		self.slider.setRange(0,100)
-		self.slider.setPageStep = 0
-		self.slider.setSingleStep = 0
 		#hell yeah
 		self.slider.show_tooltip.connect(self.display_slider_tooltip)
 		self.slider.slider_released.connect(self.slider_seek_released)
+		#stylesheets
+		self.slider.setStyleSheet("""
+									QSlider::groove:horizontal {
+     									background: white;
+     									height : 5px;
+     									border: 1px solid #bbb;
+     									border-radius: 4px;
+ 									}
+
+									 QSlider::handle:horizontal {
+									 	background: black;
+									    border: 1px solid #777;
+										width: 10px;
+										margin-top: -3px;
+										margin-bottom: -3px;
+										border-radius: 5px;
+									 }
+
+									 QSlider::add-page:horizontal {
+									     background: white;
+									 }
+
+									 QSlider::sub-page:horizontal {
+									     background: dark gray;
+									 }
+									 """)
 
 		## Adding widgets to the layout.
 		self.layout.addWidget(self.slider,3,2)
@@ -113,6 +137,8 @@ class aukWindow(QtGui.QWidget):
 		self.button.clicked.connect(self.fetch_and_update)
 		self.table.itemPressed.connect(self.play_track)
 		self.artistedit.returnPressed.connect(self.fetch_and_update)
+		self.slider.sliderMoved.connect(self.disable_slider_update)
+		self.slider.sliderReleased.connect(self.enable_slider_update)
 		
 
 		## Timer updates self.slider every 1 second.
@@ -134,6 +160,12 @@ class aukWindow(QtGui.QWidget):
 		self.setting_value = 0
 
 		self.show()
+
+	def disable_slider_update(self):
+		self.setting_value = 1
+
+	def enable_slider_update(self):
+		self.setting_value = 0
 
 	def refetch_track(self):
 		self.statusinfo.setText("Trying to refetch the track. Stand by")
@@ -205,6 +237,7 @@ class aukWindow(QtGui.QWidget):
 			return False
 		else:
 			if not self.setting_value:
+				print "I am here"
 				try:
 					self.slider.setValue(self.fetch_position())
 				except:
@@ -409,8 +442,10 @@ if __name__ == "__main__":
 
 
 	## TO DO:
+	## fix none
 	## paint QSlider
 	## integrate last.fm
 	## desktop notifications via systray
 	## add about and acknowlwdge all libs/APIs used.
-	## Internet not available notification.
+	## Internet not available notification
+	## Play next and play previous buttons
