@@ -9,6 +9,21 @@ pygst.require("0.10")
 import gst
 
 
+class fetchInfoThread(QtCore.QThread):
+	fetch_complete = QtCore.pyqtSignal(object)
+
+	def __init__(self,root_artist,root_track,key):
+		QtCore.QThread.__init__(self)
+		self.root_artist = root_artist
+		self.root_track = root_track
+		self.key = key
+
+	def run(self):
+		songinfo = auk.song_info(self.root_artist, self.root_track)
+		songinfo.append(self.key)
+		self.fetch_complete.emit(songinfo)
+
+
 
 class aukWindow(QtGui.QWidget):
 	def __init__(self):
@@ -46,6 +61,7 @@ class aukWindow(QtGui.QWidget):
 		self.table.setColumnWidth(0,35)
 		self.table.setColumnWidth(1,50)
 		self.table.setColumnWidth(2,300)
+		self.table.hideColumn(0)
 
 		## Status bar
 		self.statusinfo = QtGui.QLabel(self)
@@ -84,6 +100,8 @@ class aukWindow(QtGui.QWidget):
 		self.songsplayed = 0
 		# Helps avoid a refetch loop.
 		self.refresh_done = 0
+		# Counts the resources fetched
+		self.fcount = 0
 
 		self.show()
 
@@ -268,6 +286,48 @@ class aukWindow(QtGui.QWidget):
 			self.button.setEnabled(True)
 
 
+	def on_fetch_data(self,songinfo):
+		key = songinfo[3]
+
+		sitem = QtGui.QTableWidgetItem(str(key))
+		self.table.setItem(key,0,sitem)
+
+		pitem = QtGui.QTableWidgetItem()
+		if not songinfo[2]:
+			pitem.setFlags( QtCore.Qt.NoItemFlags )
+			icon = QtGui.QIcon.fromTheme('dialog-warning')
+			pitem.setIcon(icon)
+			self.table.setItem(key,1,pitem)
+			pitem.setToolTip("URL not found.")
+		else:
+			icon = QtGui.QIcon.fromTheme('media-playback-start')
+			pitem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled )
+			pitem.setIcon(icon)
+			self.table.setItem(key,1,pitem)
+
+		artistitem=QtGui.QTableWidgetItem(songinfo[0])
+		self.table.setItem(key,3,artistitem)
+
+		trackitem=QtGui.QTableWidgetItem(songinfo[1])
+		self.table.setItem(key,2,trackitem)
+
+		## The master dictionary that holds the info about ALL the songs.
+		self.related_songs_dict[key] = songinfo
+
+		self.fcount = self.fcount + 1
+		
+		stext = "Fetching result %d / 10. Please stand by." % (self.fcount,)
+		self.statusinfo.setText(stext)
+		QtGui.QApplication.processEvents()
+
+		if self.fcount == 10:
+			resultText = "Showing songs similar to "+"<b>"+self.trackinfo+"</b>"+"-"+"<b>"+self.artistinfo+"</b>"
+			self.statusinfo.setText(resultText)
+			self.artistedit.setText("")
+			self.trackedit.setText("")
+			self.fcount = 0
+
+
 	def fetch_and_update(self):
 		"""Queries the auk backend for the track listing. Fetches a dict"""
 
@@ -281,47 +341,17 @@ class aukWindow(QtGui.QWidget):
 
 		related_response = auk.aukfetch(10, str(self.trackinfo),str(self.artistinfo))
 
+		stext = "Fetching result %d / 10. Please stand by." % (self.fcount+1,)
+		self.statusinfo.setText(stext)
+		QtGui.QApplication.processEvents()
+
+		self.threads = []
 
 		for key,new_track in enumerate(related_response['songs']):
-			stext = "Fetching result %d / 10. Please stand by." % (key+1,)
-			self.statusinfo.setText(stext)
-			QtGui.QApplication.processEvents()
-
-			songinfo = auk.song_info(new_track['artist_name'], new_track['title'])
-
-			sitem = QtGui.QTableWidgetItem(str(key))
-			self.table.setItem(key,0,sitem)
-
-			
-			pitem = QtGui.QTableWidgetItem()
-			
-			if not songinfo[2]:
-				pitem.setFlags( QtCore.Qt.NoItemFlags )
-				icon = QtGui.QIcon.fromTheme('dialog-warning')
-				pitem.setIcon(icon)
-				self.table.setItem(key,1,pitem)
-
-				pitem.setToolTip("URL not found.")
-			else:
-				icon = QtGui.QIcon.fromTheme('media-playback-start')
-				pitem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled )
-				pitem.setIcon(icon)
-				self.table.setItem(key,1,pitem)
-
-			artistitem=QtGui.QTableWidgetItem(songinfo[0])
-			self.table.setItem(key,3,artistitem)
-
-			trackitem=QtGui.QTableWidgetItem(songinfo[1])
-			self.table.setItem(key,2,trackitem)
-
-			## The master dictionary that holds the info about ALL the songs.
-			self.related_songs_dict[key] = songinfo
-
-		resultText = "Showing songs similar to "+"<b>"+self.trackinfo+"</b>"+"-"+"<b>"+self.artistinfo+"</b>"
-		self.statusinfo.setText(resultText)
-
-		self.artistedit.setText("")
-		self.trackedit.setText("")
+			fetcher = fetchInfoThread(new_track['artist_name'], new_track['title'],key)
+			fetcher.fetch_complete.connect(self.on_fetch_data)
+			self.threads.append(fetcher)
+			fetcher.start()
 
 
 def main():
@@ -336,7 +366,8 @@ if __name__ == "__main__":
 
 
 
-	## TO DO
+	## TO DO:
 	## Display time
-	## seperate thread for adding contents.
 	## Refine seek
+	## paint QSlider
+	## integrate last fm
