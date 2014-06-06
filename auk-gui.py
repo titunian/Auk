@@ -237,7 +237,6 @@ class aukWindow(QtGui.QWidget):
 			return False
 		else:
 			if not self.setting_value:
-				print "I am here"
 				try:
 					self.slider.setValue(self.fetch_position())
 				except:
