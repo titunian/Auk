@@ -11,13 +11,23 @@ import gst
 ## Subclassing qslider to dynamically display tooltip
 class mSlider(QtGui.QSlider):
 	show_tooltip = QtCore.pyqtSignal(object)
+	slider_released = QtCore.pyqtSignal(object)
+
 	def __init__(self):
 		QtGui.QSlider.__init__(self)
 
 	def mouseMoveEvent(self, event):
-		#self.mouseMoveEvent(event)
 		self.show_tooltip.emit(event) # sending event to help figure the x cordinate of the slider
 		return QtGui.QSlider.mouseMoveEvent(self, event)
+
+	def mouseReleaseEvent(self,event):
+		self.slider_released.emit(event)
+		return QtGui.QSlider.mouseReleaseEvent(self,event)
+
+	# To ensure a chop free slider step
+	def mousePressEvent(self,event):
+		self.setValue(self.minimum() + ((self.maximum()-self.minimum()) * event.x()) / self.width() )
+		return QtGui.QSlider.mousePressEvent(self,event)
 
 
 class fetchInfoThread(QtCore.QThread):
@@ -84,8 +94,11 @@ class aukWindow(QtGui.QWidget):
 		#self.slider = QtGui.QSlider(QtCore.Qt.Horizontal, self)
 		self.slider.setMouseTracking(True) ## Enables dynamic tooltips as implemented in the code.
 		self.slider.setRange(0,100)
+		self.slider.setPageStep = 0
+		self.slider.setSingleStep = 0
 		#hell yeah
 		self.slider.show_tooltip.connect(self.display_slider_tooltip)
+		self.slider.slider_released.connect(self.slider_seek_released)
 
 		## Adding widgets to the layout.
 		self.layout.addWidget(self.slider,3,2)
@@ -100,7 +113,7 @@ class aukWindow(QtGui.QWidget):
 		self.button.clicked.connect(self.fetch_and_update)
 		self.table.itemPressed.connect(self.play_track)
 		self.artistedit.returnPressed.connect(self.fetch_and_update)
-		self.slider.sliderReleased.connect(self.slider_seek)
+		
 
 		## Timer updates self.slider every 1 second.
 		self.timer = QtCore.QTimer()
@@ -159,12 +172,12 @@ class aukWindow(QtGui.QWidget):
 
 			QtGui.QToolTip.showText(event.globalPos(), tool_text, self)
 
-	def slider_seek(self):
-		"""Gets the slider value and seeks forward or backward accordingly"""
+	def slider_seek_released(self,event):
 		self.setting_value = 1
 		if not "NULL" in str(self.player.get_state()[1]):
-			self.seek_ns = (self.slider.value()/100)*self.play_duration()
-			self.player.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, self.seek_ns)
+			percentage_pos = round(((self.slider.minimum() + (self.slider.maximum() - self.slider.minimum()))*event.x())/self.slider.width(),2)
+			play_pos = (percentage_pos*self.play_duration())/100
+			self.player.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, play_pos)
 		self.setting_value = 0
 
 	def play_duration(self):
@@ -180,8 +193,7 @@ class aukWindow(QtGui.QWidget):
 	def fetch_position(self):
 		"""Returns the percentage of song that has been played"""
 		try:
-			position_nanosecs, position_format = self.player.query_position(gst.FORMAT_TIME)
-			return (position_nanosecs/self.play_duration())*100
+			return (self.play_position()/self.play_duration())*100
 		except gst.QueryError:
 			# pipeline does not know position yet
 			pass
@@ -196,7 +208,7 @@ class aukWindow(QtGui.QWidget):
 				try:
 					self.slider.setValue(self.fetch_position())
 				except:
-					pass
+					return False
 
 	def on_message(self,bus,message):
 		""" End of track and error handling of gst"""
@@ -397,8 +409,8 @@ if __name__ == "__main__":
 
 
 	## TO DO:
-	## Refine seek
 	## paint QSlider
-	## integrate last fm
-	## desktop notifications vis systray
+	## integrate last.fm
+	## desktop notifications via systray
 	## add about and acknowlwdge all libs/APIs used.
+	## Internet not available notification.
