@@ -8,6 +8,11 @@ import pygst
 pygst.require("0.10")
 import gst
 import webbrowser
+import json
+import tempfile
+import os
+import urllib2
+
 
 from urllib import quote
 
@@ -48,17 +53,31 @@ class mSlider(QtGui.QSlider):
 class fetchInfoThread(QtCore.QThread):
 	fetch_complete = QtCore.pyqtSignal(object)
 
-	def __init__(self,root_artist,root_track,key):
+	def __init__(self,root_artist,root_track,key,url, duration):
 		QtCore.QThread.__init__(self)
 		self.root_artist = root_artist
 		self.root_track = root_track
 		self.key = key
+		self.url= url
+		self.duration = int(duration)/1000
 
 	def run(self):
-		songinfo = auk.song_info(self.root_artist, self.root_track)
+		songinfo = auk.song_info(self.root_artist, self.root_track, self.duration)
 		songinfo.append(self.key)
+		songinfo.append(self.url)
+
 		self.fetch_complete.emit(songinfo)
 
+
+class albumartThread(QtCore.QThread):
+	afetch_complete = QtCore.pyqtSignal(object)
+	def __init__(self,url):
+		QtCore.QThread.__init__(self)
+		self.url = url
+
+	def run(self):
+		data = urllib2.urlopen(self.url)
+		self.afetch_complete.emit(data)
 
 
 class aukWindow(QtGui.QWidget):
@@ -140,13 +159,26 @@ class aukWindow(QtGui.QWidget):
 									 }
 									 """)
 
+		## Now playing info button
+		self.frame = QtGui.QFrame(self)
+		#self.dividerframe.setFrameShadow(QtGui.QFrame.Sunken)
+		#self.frame.setFrameStyle(QtGui.QFrame.Box|QtGui.QFrame.Sunken)
+		self.framelayout = QtGui.QHBoxLayout(self.frame)
+
+		self.albumartlabel = QtGui.QLabel(self.frame)
+		self.nowplayinglabel = QtGui.QLabel(self.frame)
+
+		self.framelayout.addWidget(self.albumartlabel,0)
+		self.framelayout.addWidget(self.nowplayinglabel,1)
+
 		## Adding widgets to the layout.
-		self.layout.addWidget(self.slider,3,2)
 		self.layout.addWidget(self.trackedit,1,0)
-		self.layout.addWidget(self.artistedit,1,1)
-		self.layout.addWidget(self.button,1,2)
-		self.layout.addWidget(self.table,2,0,1,3)
-		self.layout.addWidget(self.statusinfo,3,0)
+		self.layout.addWidget(self.artistedit,1,1,1,2)
+		self.layout.addWidget(self.button,1,3)
+		self.layout.addWidget(self.table,2,0,1,4)
+		self.layout.addWidget(self.frame,3,0)
+		self.layout.addWidget(self.slider,3,3)
+		self.layout.addWidget(self.statusinfo,4,0)
 
 		## Intialization functions
 		self.create_systray()
@@ -181,6 +213,32 @@ class aukWindow(QtGui.QWidget):
 		self.setting_value = 0
 
 		self.show()
+
+	def set_playinginfo(self):
+
+		
+		self.albumartlabel.setText("") # replaces the ablum art, Set it only when fetch is complete
+		self.nowplayinglabel.setText("<b>  %s</b><br><b>  %s</b>" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0])) 
+
+		athreadworker = albumartThread(self.related_songs_dict[self.now_playing][4])
+		athreadworker.afetch_complete.connect(self.set_album_art)
+		self.threads.append(athreadworker)
+		athreadworker.start()
+
+	def set_album_art(self,data):
+		tfile = tempfile.NamedTemporaryFile(delete=False)
+		tfile.write(data.read())
+		tfile.close()
+
+		lfile = QtCore.QFile(tfile.name)
+		lfile.open(QtCore.QIODevice.ReadOnly)
+		ldata = lfile.map(0,lfile.size())
+		lpix = QtGui.QPixmap()
+		lpix.loadFromData(ldata)
+
+		os.unlink(tfile.name)
+		self.albumartlabel.setPixmap(lpix)
+
 
 	def create_appmenu(self):
 		self.appmenu = QtGui.QMenu(self)
@@ -396,6 +454,7 @@ class aukWindow(QtGui.QWidget):
 				item.setIcon(pauseicon)
 				QtGui.QApplication.processEvents()
 				self.trayIcon.showMessage("Now Playing", "%s-%s" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0]),QtGui.QSystemTrayIcon.Information,3000)
+				self.set_playinginfo()
 				self.tweetAction.setDisabled(False)
 				
 		else:
@@ -421,6 +480,7 @@ class aukWindow(QtGui.QWidget):
 				item.setIcon(pauseicon)
 				QtGui.QApplication.processEvents()
 				self.trayIcon.showMessage("Now Playing", "%s-%s" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0]),QtGui.QSystemTrayIcon.Information,3000)
+				self.set_playinginfo()
 				self.tweetAction.setDisabled(False)
 				
 	def enablebutton(self):
@@ -460,7 +520,7 @@ class aukWindow(QtGui.QWidget):
 
 		self.fcount = self.fcount + 1
 		
-		stext = "Fetching result %d / 10. Please stand by." % (self.fcount,)
+		stext = "Fetching result %d / %d. Please stand by." % (self.fcount,self.COUNT,)
 		self.statusinfo.setText(stext)
 		QtGui.QApplication.processEvents()
 
@@ -473,31 +533,34 @@ class aukWindow(QtGui.QWidget):
 
 	def fetch_and_update(self):
 		"""Queries the auk backend for the track listing. Fetches a dict"""
-		
+		self.COUNT = 10
 		# Clear all the rows and reallocate.
 		self.table.setRowCount(0)
-		self.table.setRowCount(10)
+		self.table.setRowCount(self.COUNT)
 
 		self.artistinfo = self.artistedit.text()
 		self.trackinfo = self.trackedit.text()
 		self.related_songs_dict = {}
-		try:
-			related_response = auk.aukfetch(10, str(self.trackinfo),str(self.artistinfo))
-			stext = "Fetching result %d / 10. Please stand by." % (self.fcount+1,)
-			self.statusinfo.setText(stext)
-			QtGui.QApplication.processEvents()
 
-			self.threads = []
+		#try:
+		rresponse = auk.aukfetch(self.COUNT, str(self.trackinfo),str(self.artistinfo))
+		related_response = json.load(rresponse)
 
-			for key,new_track in enumerate(related_response['songs']):
-				fetcher = fetchInfoThread(new_track['artist_name'], new_track['title'],key)
-				fetcher.fetch_complete.connect(self.on_fetch_data)
-				self.threads.append(fetcher)
-				fetcher.start()
-		except:
-			self.statusinfo.setText("Could not find matches.")
-			self.artistedit.setText("")
-			self.trackedit.setText("")
+		stext = "Fetching result %d / %d. Please stand by." % (self.fcount+1,self.COUNT)
+		self.statusinfo.setText(stext)
+		QtGui.QApplication.processEvents()
+
+		self.threads = []
+
+		for key,new_track in enumerate(related_response['similartracks']['track']):
+			fetcher = fetchInfoThread(new_track['artist']['name'], new_track['name'],key,new_track['image'][1]['#text'],new_track['duration'])
+			fetcher.fetch_complete.connect(self.on_fetch_data)
+			self.threads.append(fetcher)
+			fetcher.start()
+		# except:
+		# 	self.statusinfo.setText("<b>Could not find similar tracks.</b>")
+		# 	self.artistedit.setText("")
+		# 	self.trackedit.setText("")
 
 		
 
@@ -512,7 +575,7 @@ if __name__ == "__main__":
 	main()
 
 
-
 	## TO DO:
 	## 3. integrate last.fm
+	## Move away from echonest to last fm
 	## 2. Internet not available notification
