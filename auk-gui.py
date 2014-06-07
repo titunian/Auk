@@ -65,6 +65,7 @@ class fetchInfoThread(QtCore.QThread):
 		songinfo = auk.song_info(self.root_artist, self.root_track, self.duration)
 		songinfo.append(self.key)
 		songinfo.append(self.url)
+		songinfo.append(self.root_duration)
 
 		self.fetch_complete.emit(songinfo)
 
@@ -293,8 +294,9 @@ class aukWindow(QtGui.QWidget):
 
 		temptrack = tempinfo[1]
 		tempartist = tempinfo[0]
+		tempduration = tempinfo[5]
 
-		tempurl = auk.song_info(tempartist,temptrack)[2]
+		tempurl = auk.song_info(tempartist,temptrack,tempduration)[2]
 
 		self.related_songs_dict[self.now_playing][2] = tempurl
 
@@ -575,5 +577,5 @@ if __name__ == "__main__":
 
 	## TO DO:
 	## 3. integrate last.fm
+	## Move away from echonest to last fm
 	## 2. Internet not available notification
-	## 1. urllib timeout
