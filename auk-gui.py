@@ -575,5 +575,5 @@ if __name__ == "__main__":
 
 	## TO DO:
 	## 3. integrate last.fm
-	## Move away from echonest to last fm
 	## 2. Internet not available notification
+	## 1. urllib timeout
