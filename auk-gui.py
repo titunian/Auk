@@ -7,6 +7,7 @@ import gobject
 import pygst
 pygst.require("0.10")
 import gst
+import webbrowser
 
 
 ## Subclassing qslider to dynamically display tooltip
@@ -167,9 +168,16 @@ class aukWindow(QtGui.QWidget):
 
 
 	def create_systray(self):
+		self.minimizeAction = QtGui.QAction("Minimize",self,triggered=self.hide)
+		self.restoreAction = QtGui.QAction("Restore",self,triggered=self.showNormal)
+		self.aboutAction = QtGui.QAction("About",self,triggered=self.show_about)
 		self.quitAction = QtGui.QAction("Quit",self,triggered=QtGui.qApp.quit)
 
 		self.traymenu = QtGui.QMenu(self)
+		self.traymenu.addAction(self.minimizeAction)
+		self.traymenu.addAction(self.restoreAction)
+		self.traymenu.addAction(self.aboutAction)
+		self.traymenu.addSeparator()
 		self.traymenu.addAction(self.quitAction)
 
 		self.trayIcon = QtGui.QSystemTrayIcon(self)
@@ -177,6 +185,11 @@ class aukWindow(QtGui.QWidget):
 		self.trayIcon.setIcon(QtGui.QIcon.fromTheme('media-playback-start'))
 		self.trayIcon.show()
 		
+	def show_about(self):
+		self.showNormal()
+		self.aboutmbox = QtGui.QMessageBox(self)
+		self.aboutmbox.setText("<b>Auk Version 0.1</b><br><br>Homepage: https://github.com/slotlocker2/Auk</br></br><br>Powered by Soundcloud and EchoNest.</br>")
+		self.aboutmbox.exec_()
 
 	def disable_slider_update(self):
 		self.setting_value = 1
@@ -447,6 +460,8 @@ class aukWindow(QtGui.QWidget):
 				fetcher.start()
 		except:
 			self.statusinfo.setText("Could not find matches.")
+			self.artistedit.setText("")
+			self.trackedit.setText("")
 
 		
 
@@ -464,6 +479,5 @@ if __name__ == "__main__":
 
 	## TO DO:
 	## 3. integrate last.fm
-	## 1. add about and acknowlwdge all libs/APIs used.
 	## 2. Internet not available notification
-	## 3. Copy track information. (?)
+	## 3. Tweet now playing
