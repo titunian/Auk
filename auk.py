@@ -1,24 +1,20 @@
 import sys
 import soundcloud
-import pyen
+import urllib2
 
 #Configuration
-pyen_key = "8GDKECFTIJHEADTWC" #echonest
 client_id = "53188e4558d06691aac3cf57ef3a7cd7" #soundcloud
+lastfm_key = "f53c270502a8d4135bf6964d7719e50e"
+
 # Setting things up
-en = pyen.Pyen(pyen_key)
 client = soundcloud.Client(client_id=client_id)
 
 
 # Dicts are resource heavy. Avoid them wherever possible.
 
-def song_info(root_artist, root_track):
+def song_info(root_artist, root_track, root_duration):
 	""" Takes in track/artist as arguments and returns a list with related information"""
 	templist=[]
-	track_response = en.get('song/search', artist=root_artist, title=root_track, bucket=['audio_summary'], results=1)
-	for track in track_response['songs']:
-		root_duration = track["audio_summary"]['duration']
-
 	templist.append(root_artist)
 	templist.append(root_track)
 	templist.append(sc_streamurl(root_track, root_artist, root_duration))
@@ -26,11 +22,10 @@ def song_info(root_artist, root_track):
 	return templist
 
 
-def aukfetch(size, root_track, root_artist = None):
-	"""Takes in track/(artist) and size as arguments and returns size number of related track info as a dict"""
-
-	## Including size as an argument helps in realizing dynamic playlists.
-	relatedtracks_response = en.get('playlist/static', artist=root_artist, type='artist-radio', results=size)
+def aukfetch(size, root_track, root_artist):
+	"""Takes in both the track and the artist and returns size number of related track info as a dict"""
+	url = "http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&artist=%s&track=%s&api_key=%s&format=json&limit=%d&autocorrect=1" % (urllib2.quote(root_artist),urllib2.quote(root_track),lastfm_key,size)
+	relatedtracks_response = urllib2.urlopen(url)
 	return relatedtracks_response
 
 
