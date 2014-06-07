@@ -161,8 +161,7 @@ class aukWindow(QtGui.QWidget):
 
 		## Now playing info button
 		self.frame = QtGui.QFrame(self)
-		#self.dividerframe.setFrameShadow(QtGui.QFrame.Sunken)
-		#self.frame.setFrameStyle(QtGui.QFrame.Box|QtGui.QFrame.Sunken)
+		self.frame.setFrameShadow(QtGui.QFrame.StyledPanel| QtGui.QFrame.Sunken) 
 		self.framelayout = QtGui.QHBoxLayout(self.frame)
 
 		self.albumartlabel = QtGui.QLabel(self.frame)
@@ -188,7 +187,7 @@ class aukWindow(QtGui.QWidget):
 		self.artistedit.textChanged.connect(self.enablebutton)
 		self.button.clicked.connect(self.fetch_and_update)
 		self.table.itemPressed.connect(self.play_track)
-		self.artistedit.returnPressed.connect(self.fetch_and_update)
+		self.artistedit.textChanged.connect(self.enablebutton)
 		self.slider.sliderMoved.connect(self.disable_slider_update)
 		self.slider.sliderReleased.connect(self.enable_slider_update)
 		self.table.tweetsignal.connect(self.show_rightclickmenu)
@@ -216,7 +215,6 @@ class aukWindow(QtGui.QWidget):
 
 	def set_playinginfo(self):
 
-		
 		self.albumartlabel.setText("") # replaces the ablum art, Set it only when fetch is complete
 		self.nowplayinglabel.setText("<b>  %s</b><br><b>  %s</b>" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0])) 
 
@@ -485,7 +483,7 @@ class aukWindow(QtGui.QWidget):
 				
 	def enablebutton(self):
 		"""Enables search button only when the track edit field is not empty"""
-		if self.artistedit.text() == "":
+		if self.artistedit.text() == "" or self.trackedit == "":
 			self.button.setEnabled(False)
 		else:
 			self.button.setEnabled(True)
@@ -542,25 +540,25 @@ class aukWindow(QtGui.QWidget):
 		self.trackinfo = self.trackedit.text()
 		self.related_songs_dict = {}
 
-		#try:
-		rresponse = auk.aukfetch(self.COUNT, str(self.trackinfo),str(self.artistinfo))
-		related_response = json.load(rresponse)
+		try:
+			rresponse = auk.aukfetch(self.COUNT, str(self.trackinfo),str(self.artistinfo))
+			related_response = json.load(rresponse)
 
-		stext = "Fetching result %d / %d. Please stand by." % (self.fcount+1,self.COUNT)
-		self.statusinfo.setText(stext)
-		QtGui.QApplication.processEvents()
+			stext = "Fetching result %d / %d. Please stand by." % (self.fcount+1,self.COUNT)
+			self.statusinfo.setText(stext)
+			QtGui.QApplication.processEvents()
 
-		self.threads = []
+			self.threads = []
 
-		for key,new_track in enumerate(related_response['similartracks']['track']):
-			fetcher = fetchInfoThread(new_track['artist']['name'], new_track['name'],key,new_track['image'][1]['#text'],new_track['duration'])
-			fetcher.fetch_complete.connect(self.on_fetch_data)
-			self.threads.append(fetcher)
-			fetcher.start()
-		# except:
-		# 	self.statusinfo.setText("<b>Could not find similar tracks.</b>")
-		# 	self.artistedit.setText("")
-		# 	self.trackedit.setText("")
+			for key,new_track in enumerate(related_response['similartracks']['track']):
+				fetcher = fetchInfoThread(new_track['artist']['name'], new_track['name'],key,new_track['image'][1]['#text'],new_track['duration'])
+				fetcher.fetch_complete.connect(self.on_fetch_data)
+				self.threads.append(fetcher)
+				fetcher.start()
+		except:
+			self.statusinfo.setText("<b>Could not find similar tracks.</b>")
+			self.artistedit.setText("")
+			self.trackedit.setText("")
 
 		
 
