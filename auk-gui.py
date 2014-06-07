@@ -9,6 +9,19 @@ pygst.require("0.10")
 import gst
 import webbrowser
 
+from urllib import quote
+
+##Subclassing Qtablewidget to have a right click menu 
+class mTablewidet(QtGui.QTableWidget):
+	tweetsignal = QtCore.pyqtSignal()
+
+	def __init__(self):
+		QtGui.QTableWidget.__init__(self)
+
+	def contextMenuEvent(self,event):
+		self.tweetsignal.emit()
+		return QtGui.QTableWidget.contextMenuEvent(self,event)
+
 
 ## Subclassing qslider to dynamically display tooltip
 class mSlider(QtGui.QSlider):
@@ -68,7 +81,8 @@ class aukWindow(QtGui.QWidget):
 		self.button.setEnabled(False)
 
 		## Tablewidget
-		self.table = QtGui.QTableWidget(self)
+		#self.table = QtGui.QTableWidget(self)
+		self.table = mTablewidet()
 		self.table.setColumnCount(4)
 		self.table.setWordWrap(True)
 		self.table.setSortingEnabled(False)
@@ -136,6 +150,7 @@ class aukWindow(QtGui.QWidget):
 
 		## Intialization functions
 		self.create_systray()
+		self.create_appmenu()
 
 		## The signals.
 		self.artistedit.textChanged.connect(self.enablebutton)
@@ -144,6 +159,7 @@ class aukWindow(QtGui.QWidget):
 		self.artistedit.returnPressed.connect(self.fetch_and_update)
 		self.slider.sliderMoved.connect(self.disable_slider_update)
 		self.slider.sliderReleased.connect(self.enable_slider_update)
+		self.table.tweetsignal.connect(self.show_rightclickmenu)
 		
 
 		## Timer updates self.slider every 1 second.
@@ -166,6 +182,22 @@ class aukWindow(QtGui.QWidget):
 
 		self.show()
 
+	def create_appmenu(self):
+		self.appmenu = QtGui.QMenu(self)
+
+		self.tweetAction = QtGui.QAction("Tweet now playing",self,triggered=self.tweet_nowplaying)
+		self.tweetAction.setDisabled(True)
+
+		self.appmenu.addAction(self.tweetAction)
+		self.appmenu.addAction(self.aboutAction)
+
+	def show_rightclickmenu(self):
+		self.appmenu.popup(QtGui.QCursor.pos())
+
+	def tweet_nowplaying(self):
+		content="#nowplaying %s-%s on #Auk" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0])
+		URL = "https://twitter.com/intent/tweet?text=" + quote(content)
+		webbrowser.open(URL)
 
 	def create_systray(self):
 		self.minimizeAction = QtGui.QAction("Minimize",self,triggered=self.hide)
@@ -351,6 +383,7 @@ class aukWindow(QtGui.QWidget):
 				self.is_playing = False
 				item.setIcon(starticon)
 				self.now_playing = irowactual
+				self.tweetAction.setDisabled(True)
 			else:
 				## Here is where the song chnages while playing.
 				self.table.item(self.now_playing,1).setIcon(starticon)
@@ -363,6 +396,7 @@ class aukWindow(QtGui.QWidget):
 				item.setIcon(pauseicon)
 				QtGui.QApplication.processEvents()
 				self.trayIcon.showMessage("Now Playing", "%s-%s" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0]),QtGui.QSystemTrayIcon.Information,3000)
+				self.tweetAction.setDisabled(False)
 				
 		else:
 			## Here is where the song resumes playing after kicked back to life from a paused state.
@@ -371,6 +405,7 @@ class aukWindow(QtGui.QWidget):
 				self.is_playing = True
 				item.setIcon(pauseicon)
 				self.now_playing = irowactual
+				self.tweetAction.setDisabled(False)
 			else:
 				## Here is where a song kicks off when there is no song playing.
 				if self.songsplayed:
@@ -386,6 +421,7 @@ class aukWindow(QtGui.QWidget):
 				item.setIcon(pauseicon)
 				QtGui.QApplication.processEvents()
 				self.trayIcon.showMessage("Now Playing", "%s-%s" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0]),QtGui.QSystemTrayIcon.Information,3000)
+				self.tweetAction.setDisabled(False)
 				
 	def enablebutton(self):
 		"""Enables search button only when the track edit field is not empty"""
@@ -480,4 +516,3 @@ if __name__ == "__main__":
 	## TO DO:
 	## 3. integrate last.fm
 	## 2. Internet not available notification
-	## 3. Tweet now playing
