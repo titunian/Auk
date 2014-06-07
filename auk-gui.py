@@ -65,7 +65,7 @@ class fetchInfoThread(QtCore.QThread):
 		songinfo = auk.song_info(self.root_artist, self.root_track, self.duration)
 		songinfo.append(self.key)
 		songinfo.append(self.url)
-		songinfo.append(self.root_duration)
+		songinfo.append(self.duration)
 
 		self.fetch_complete.emit(songinfo)
 
