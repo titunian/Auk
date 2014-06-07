@@ -1,12 +1,13 @@
 from __future__ import division
 import sys
-from PyQt4 import QtGui, QtCore
+from PyQt4 import QtGui, QtCore ## Maybe you can trim down the depends by importing widgets directly
 import auk
 # Would have been brilliant if Phonon had behaved properly. gst is kickass.
 import gobject
 import pygst
 pygst.require("0.10")
 import gst
+
 
 ## Subclassing qslider to dynamically display tooltip
 class mSlider(QtGui.QSlider):
@@ -20,16 +21,16 @@ class mSlider(QtGui.QSlider):
 		self.show_tooltip.emit(event) # sending event to help figure the x cordinate of the slider
 		return QtGui.QSlider.mouseMoveEvent(self, event)
 
-	def mouseReleaseEvent(self,event):
+	def mouseReleaseEvent(self,event): 
 		self.slider_released.emit(event)
 		return QtGui.QSlider.mouseReleaseEvent(self,event)
 
-	# To ensure a chop free slider step
+	# To ensure a chop free slider step ( Defeating pageStep and singleStep )
 	def mousePressEvent(self,event):
 		self.setValue(self.minimum() + ((self.maximum()-self.minimum()) * event.x()) / self.width() )
 		return QtGui.QSlider.mousePressEvent(self,event)
 
-
+# Thread which is responsible for fetching the content.
 class fetchInfoThread(QtCore.QThread):
 	fetch_complete = QtCore.pyqtSignal(object)
 
@@ -86,7 +87,7 @@ class aukWindow(QtGui.QWidget):
 
 		## Status bar
 		self.statusinfo = QtGui.QLabel(self)
-		self.statusinfo.setText("Welcome.")
+		self.statusinfo.setText("<b>Welcome.</b>")
 
 		## Slider
 		self.slider = mSlider()
@@ -101,26 +102,26 @@ class aukWindow(QtGui.QWidget):
 		self.slider.setStyleSheet("""
 									QSlider::groove:horizontal {
      									background: white;
-     									height : 5px;
+     									height : 2px;
      									border: 1px solid #bbb;
      									border-radius: 4px;
  									}
 
 									 QSlider::handle:horizontal {
-									 	background: black;
+									 	background: silver;
 									    border: 1px solid #777;
-										width: 10px;
-										margin-top: -3px;
-										margin-bottom: -3px;
-										border-radius: 5px;
+										width: 14px;
+										margin-top: -7px;
+										margin-bottom: -7px;
+										border-radius: 7px;
 									 }
 
 									 QSlider::add-page:horizontal {
-									     background: white;
+									     background: dark gray;
 									 }
 
 									 QSlider::sub-page:horizontal {
-									     background: dark gray;
+									     background: light gray;
 									 }
 									 """)
 
@@ -132,8 +133,11 @@ class aukWindow(QtGui.QWidget):
 		self.layout.addWidget(self.table,2,0,1,3)
 		self.layout.addWidget(self.statusinfo,3,0)
 
+		## Intialization functions
+		self.create_systray()
+
 		## The signals.
-		self.trackedit.textChanged.connect(self.enablebutton)
+		self.artistedit.textChanged.connect(self.enablebutton)
 		self.button.clicked.connect(self.fetch_and_update)
 		self.table.itemPressed.connect(self.play_track)
 		self.artistedit.returnPressed.connect(self.fetch_and_update)
@@ -160,6 +164,19 @@ class aukWindow(QtGui.QWidget):
 		self.setting_value = 0
 
 		self.show()
+
+
+	def create_systray(self):
+		self.quitAction = QtGui.QAction("Quit",self,triggered=QtGui.qApp.quit)
+
+		self.traymenu = QtGui.QMenu(self)
+		self.traymenu.addAction(self.quitAction)
+
+		self.trayIcon = QtGui.QSystemTrayIcon(self)
+		self.trayIcon.setContextMenu(self.traymenu)
+		self.trayIcon.setIcon(QtGui.QIcon.fromTheme('media-playback-start'))
+		self.trayIcon.show()
+		
 
 	def disable_slider_update(self):
 		self.setting_value = 1
@@ -237,7 +254,6 @@ class aukWindow(QtGui.QWidget):
 			return False
 		else:
 			if not self.setting_value:
-				print "I am here"
 				try:
 					self.slider.setValue(self.fetch_position())
 				except:
@@ -323,7 +339,7 @@ class aukWindow(QtGui.QWidget):
 				item.setIcon(starticon)
 				self.now_playing = irowactual
 			else:
-				## Here is where the song
+				## Here is where the song chnages while playing.
 				self.table.item(self.now_playing,1).setIcon(starticon)
 				self.player.set_state(gst.STATE_NULL)
 				self.player.set_property('uri',song_uri)
@@ -333,6 +349,7 @@ class aukWindow(QtGui.QWidget):
 				self.is_playing = True
 				item.setIcon(pauseicon)
 				QtGui.QApplication.processEvents()
+				self.trayIcon.showMessage("Now Playing", "%s-%s" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0]),QtGui.QSystemTrayIcon.Information,3000)
 				
 		else:
 			## Here is where the song resumes playing after kicked back to life from a paused state.
@@ -355,10 +372,11 @@ class aukWindow(QtGui.QWidget):
 				self.refresh_done = 0
 				item.setIcon(pauseicon)
 				QtGui.QApplication.processEvents()
+				self.trayIcon.showMessage("Now Playing", "%s-%s" % (self.related_songs_dict[self.now_playing][1],self.related_songs_dict[self.now_playing][0]),QtGui.QSystemTrayIcon.Information,3000)
 				
 	def enablebutton(self):
 		"""Enables search button only when the track edit field is not empty"""
-		if self.trackedit.text() == "":
+		if self.artistedit.text() == "":
 			self.button.setEnabled(False)
 		else:
 			self.button.setEnabled(True)
@@ -406,7 +424,7 @@ class aukWindow(QtGui.QWidget):
 
 	def fetch_and_update(self):
 		"""Queries the auk backend for the track listing. Fetches a dict"""
-
+		
 		# Clear all the rows and reallocate.
 		self.table.setRowCount(0)
 		self.table.setRowCount(10)
@@ -414,20 +432,23 @@ class aukWindow(QtGui.QWidget):
 		self.artistinfo = self.artistedit.text()
 		self.trackinfo = self.trackedit.text()
 		self.related_songs_dict = {}
+		try:
+			related_response = auk.aukfetch(10, str(self.trackinfo),str(self.artistinfo))
+			stext = "Fetching result %d / 10. Please stand by." % (self.fcount+1,)
+			self.statusinfo.setText(stext)
+			QtGui.QApplication.processEvents()
 
-		related_response = auk.aukfetch(10, str(self.trackinfo),str(self.artistinfo))
+			self.threads = []
 
-		stext = "Fetching result %d / 10. Please stand by." % (self.fcount+1,)
-		self.statusinfo.setText(stext)
-		QtGui.QApplication.processEvents()
+			for key,new_track in enumerate(related_response['songs']):
+				fetcher = fetchInfoThread(new_track['artist_name'], new_track['title'],key)
+				fetcher.fetch_complete.connect(self.on_fetch_data)
+				self.threads.append(fetcher)
+				fetcher.start()
+		except:
+			self.statusinfo.setText("Could not find matches.")
 
-		self.threads = []
-
-		for key,new_track in enumerate(related_response['songs']):
-			fetcher = fetchInfoThread(new_track['artist_name'], new_track['title'],key)
-			fetcher.fetch_complete.connect(self.on_fetch_data)
-			self.threads.append(fetcher)
-			fetcher.start()
+		
 
 def main():
 	gobject.threads_init()
@@ -442,10 +463,7 @@ if __name__ == "__main__":
 
 
 	## TO DO:
-	## fix none
-	## paint QSlider
-	## integrate last.fm
-	## desktop notifications via systray
-	## add about and acknowlwdge all libs/APIs used.
-	## Internet not available notification
-	## Play next and play previous buttons
+	## 3. integrate last.fm
+	## 1. add about and acknowlwdge all libs/APIs used.
+	## 2. Internet not available notification
+	## 3. Copy track information. (?)
