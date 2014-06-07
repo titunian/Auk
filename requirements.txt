@@ -1,2 +1,4 @@
 soundcloud==0.4.1
 pyen==2.3
+pyqt==4
+pygst==0.10
